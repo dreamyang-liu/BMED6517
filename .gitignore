@@ -1,1 +1,5 @@
 __pycache__
+chest_xray/
+data/
+MNIST/
+lightning_logs/
