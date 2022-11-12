@@ -5,8 +5,8 @@ import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
-from torchvision.transforms import ToTensor, Compose, Resize, Normalize, RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
-
+from torchvision.transforms import ToTensor, Compose, Resize, RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
+from argparser import args
 def unzip(filename):
     with zipfile.ZipFile(filename, 'r') as zip_ref:
         zip_ref.extractall("./")
@@ -27,16 +27,20 @@ class XRayDataset(Dataset):
             if i.endswith('.jpeg'):
                 data.append(self.path + "/NORMAL/" + i)
                 labels.append(0)
+        self.data.extend(data)
+        self.labels.extend(labels)
         if self.stage == 'train':
             # Augument NORAML class with 2x data, since 1:3 ratio is not good
-            for i in range(2):
-                self.data.extend(data)
-                self.labels.extend(labels)
+            if args.ovs:
+                for i in range(2):
+                    self.data.extend(data)
+                    self.labels.extend(labels)
+            else:
+                print("WARNING: No OverSampling")
         for i in os.listdir(self.path + "/PNEUMONIA"):
             if i.endswith('.jpeg'):
                 self.data.append(self.path + "/PNEUMONIA/" + i)
                 self.labels.append(1)
-        
 
     def __len__(self):
         return len(self.data)
@@ -64,7 +68,7 @@ class XRaySampleDataset(Dataset):
         for i in os.listdir(self.path + "/NORMAL"):
             if i.endswith('.jpeg'):
                 self.data.append(self.path + "/NORMAL/" + i)
-                self.labels.append(0)
+                self.labels.append(0.)
         for i in os.listdir(self.path + "/PNEUMONIA"):
             if i.endswith('.jpeg'):
                 self.data.append(self.path + "/PNEUMONIA/" + i)
@@ -90,29 +94,41 @@ class XRaySampleDataset(Dataset):
         return img, self.labels[idx]
 
 class XRayDataModule(pl.LightningDataModule):
-    RESIZE_SHAPE = [224, 224]
+    RESIZE_SHAPE = [args.resize, args.resize]
 
     def __init__(self, batch_size=32, sample_ratio=None):
         super().__init__()
         self.batch_size = batch_size
         self.sample_ratio = sample_ratio
 
+        if args.aug:
+            train_transforms = Compose([
+                Resize(self.RESIZE_SHAPE),
+                RandomHorizontalFlip(),
+                RandomVerticalFlip(),
+                RandomRotation(15),
+                ToTensor(),
+            ])
+        else:
+            print("WARNING: No Augumentation")
+            train_transforms = Compose([
+                Resize(self.RESIZE_SHAPE),
+                ToTensor(),
+            ])
 
-        transforms = Compose([
+        val_transforms = Compose([
             Resize(self.RESIZE_SHAPE),
-            RandomHorizontalFlip(),
-            RandomVerticalFlip(),
-            RandomRotation(15),
             ToTensor(),
         ])
+
         if self.sample_ratio is None:
-            self.x_ray_train = XRayDataset(stage='train', transform=transforms)
-            self.x_ray_val = XRayDataset(stage='val', transform=transforms)
-            self.x_ray_test = XRayDataset(stage='test', transform=transforms)
+            self.x_ray_train = XRayDataset(stage='train', transform=train_transforms)
+            self.x_ray_val = XRayDataset(stage='val', transform=val_transforms)
+            self.x_ray_test = XRayDataset(stage='test', transform=val_transforms)
         else:
-            self.x_ray_train = XRaySampleDataset(stage='train', sample_ratio=self.sample_ratio, transform=transforms)
-            self.x_ray_val = XRaySampleDataset(stage='val', sample_ratio=self.sample_ratio, transform=transforms)
-            self.x_ray_test = XRaySampleDataset(stage='test', sample_ratio=self.sample_ratio, transform=transforms)
+            self.x_ray_train = XRaySampleDataset(stage='train', sample_ratio=self.sample_ratio, transform=train_transforms)
+            self.x_ray_val = XRaySampleDataset(stage='val', sample_ratio=self.sample_ratio, transform=val_transforms)
+            self.x_ray_test = XRaySampleDataset(stage='test', sample_ratio=self.sample_ratio, transform=val_transforms)
 
     def setup(self, stage=None):
         pass
