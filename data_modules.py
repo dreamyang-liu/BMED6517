@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
-from torchvision.transforms import ToTensor, Compose, Resize, RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
+from torchvision.transforms import ToTensor, Compose, Normalize, Resize, RandomHorizontalFlip, RandomVerticalFlip, RandomRotation
 from argparser import args
 def unzip(filename):
     with zipfile.ZipFile(filename, 'r') as zip_ref:
@@ -32,7 +32,7 @@ class XRayDataset(Dataset):
         if self.stage == 'train':
             # Augument NORAML class with 2x data, since 1:3 ratio is not good
             if args.ovs:
-                for i in range(2):
+                for i in range(3):
                     self.data.extend(data)
                     self.labels.extend(labels)
             else:
@@ -106,19 +106,22 @@ class XRayDataModule(pl.LightningDataModule):
                 Resize(self.RESIZE_SHAPE),
                 RandomHorizontalFlip(),
                 RandomVerticalFlip(),
-                RandomRotation(15),
+                RandomRotation(180),
                 ToTensor(),
+                Normalize(mean=[0.5], std=[0.5])
             ])
         else:
             print("WARNING: No Augumentation")
             train_transforms = Compose([
                 Resize(self.RESIZE_SHAPE),
                 ToTensor(),
+                Normalize(mean=[0.5], std=[0.5])
             ])
 
         val_transforms = Compose([
             Resize(self.RESIZE_SHAPE),
             ToTensor(),
+            Normalize(mean=[0.5], std=[0.5])
         ])
 
         if self.sample_ratio is None:
