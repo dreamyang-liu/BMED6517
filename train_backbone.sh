@@ -1,8 +1,11 @@
-backbone=resnet18
+# backbone=mobilenet_v2
+backbone=resnet50
+# backbone=alexnet 
+# backbone=squeezenet1_1
 
-resize=256
-lr=0.001
-epochs=10
+resize=224
+lr=0.0002
+epochs=40
 batch_size=64
 
 python main.py \
@@ -12,3 +15,5 @@ python main.py \
 --batch_size ${batch_size} \
 --resize ${resize} \
 --gpu 1 \
+--ovs \
+--aug
